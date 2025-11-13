@@ -1,0 +1,56 @@
+# --- Build folders ---
+build/
+build*/         
+cmake-build*/   
+Debug/
+Release/
+
+# --- Compiled object and output files ---
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.map
+*.srec
+*.list
+*.out
+*.d
+
+# --- IDE / Editor configs ---
+.vscode/
+.settings/
+.idea/
+MDK-ARM/
+*.launch
+*.workspace
+*.depend
+*.db
+*.user
+*.swp
+
+# --- STM32CubeMX temp and backup files ---
+mx.scratch
+*.ioc-backup
+*.bak
+*.tmp
+*.log
+
+# --- CMake generated files ---
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+compile_commands.json
+*.cmake
+
+# --- System / OS junk ---
+.DS_Store
+Thumbs.db
+
+# --- Ninja build system ---
+.ninja_deps
+.ninja_log
+
+# --- Ignore generated index files ---
+*.idx
