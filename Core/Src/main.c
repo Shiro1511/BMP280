@@ -23,6 +23,9 @@
 /* USER CODE BEGIN Includes */
 #include "BMP280.h"
 #include "UART_Handle.h"
+#include "stdio.h"
+#include "string.h"
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,6 +64,69 @@ static void MX_USART1_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 float temperature = 0.0f, pressure = 0.0f;
+uint8_t data_rx;
+char tx_buffer[50];
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == huart1.Instance)
+  {
+    UART_Receive_Rx(&data_rx);
+    HAL_UART_Receive_IT(&huart1, &data_rx, 1);
+  }
+}
+
+void float_to_str(float value, char *buffer, int decimal_places)
+{
+  char temp_buffer[20];
+  int is_negative = 0;
+
+  if (value < 0)
+  {
+    is_negative = 1;
+    value = -value;
+  }
+
+  int integer_part = (int)value;
+  float fractional_part = value - integer_part;
+
+  int fractional_int = 0;
+  for (int i = 0; i < decimal_places; i++)
+  {
+    fractional_part *= 10;
+  }
+  fractional_int = (int)(fractional_part + 0.5);
+
+  // Xử lý tràn
+  if (fractional_int >= pow(10, decimal_places))
+  {
+    integer_part++;
+    fractional_int = 0;
+  }
+
+  if (decimal_places == 1)
+  {
+    sprintf(temp_buffer, "%d.%d", integer_part, fractional_int);
+  }
+  else if (decimal_places == 2)
+  {
+    sprintf(temp_buffer, "%d.%02d", integer_part, fractional_int);
+  }
+  else
+  {
+    sprintf(temp_buffer, "%d.%d", integer_part, fractional_int);
+  }
+
+  // Thêm dấu âm nếu cần
+  if (is_negative)
+  {
+    sprintf(buffer, "-%s", temp_buffer);
+  }
+  else
+  {
+    strcpy(buffer, temp_buffer);
+  }
+}
 /* USER CODE END 0 */
 
 /**
@@ -95,12 +161,14 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  UART_Handle_Init();
+  HAL_UART_Receive_IT(&huart1, &data_rx, 1);
   HAL_StatusTypeDef status = BMP280_Init(&hbmp280_1, &hi2c1);
   if (status == HAL_OK)
   {
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_15, GPIO_PIN_SET);
-    }
-  uint32_t last_time = 0;
+  }
+  uint32_t last_send = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -110,17 +178,26 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    if (HAL_GetTick() - last_time >= 1000)
+    if (status == HAL_OK && (HAL_GetTick() - last_send > 2000)) /* Each 2 seconds */
     {
-      HAL_StatusTypeDef read_status = BMP280_Read_Temperature_And_Pressure(&hbmp280_1, &temperature, &pressure);
-
-      if (read_status == HAL_OK)
+      if (BMP280_Read_Temperature_And_Pressure(&hbmp280_1, &temperature, &pressure) == HAL_OK)
       {
-        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+        char temp_str[10], press_str[10];
+        float_to_str(temperature, temp_str, 1);
+        float_to_str(pressure, press_str, 1);
+        int len = sprintf(tx_buffer, "T:%sC P:%shPa\r\n", temp_str, press_str);
+        HAL_UART_Transmit(&huart1, (uint8_t *)tx_buffer, len, 1000);
+
+        HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
       }
-      last_time = HAL_GetTick();
+      else
+      {
+        HAL_UART_Transmit(&huart1, (uint8_t *)"READ ERROR\r\n", 12, 1000);
+      }
+      last_send = HAL_GetTick();
     }
   }
+
   /* USER CODE END 3 */
 }
 
